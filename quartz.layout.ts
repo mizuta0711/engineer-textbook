@@ -1,50 +1,8 @@
 import { PageLayout, SharedLayout } from "./quartz/cfg"
 import * as Component from "./quartz/components"
 
-// ファイル名からorder値を計算（00, 01, ... 3A, 3B, 3Z などを数値に変換）
-function getOrderFromSlug(slug: string): number {
-  // インデックスページ（第X部_xxxや付録）は0
-  if (slug.startsWith("第") || slug === "付録") {
-    return 0
-  }
-
-  // ファイル名から番号部分を取得（例: "30_設計書" → "30"）
-  const match = slug.match(/^([0-9a-z]{2})[-_]/i)
-  if (!match) return 999
-
-  const code = match[1].toUpperCase()
-  const first = code[0]
-  const second = code[1]
-
-  // 16進数風の変換: 0-9はそのまま、A=10, B=11, ..., Z=35
-  function charToNum(c: string): number {
-    if (c >= "0" && c <= "9") return parseInt(c)
-    return c.charCodeAt(0) - "A".charCodeAt(0) + 10
-  }
-
-  // 部番号 * 100 + ページ番号 + 1
-  return charToNum(first) * 100 + charToNum(second) + 1
-}
-
-// ファイル名から章内の連番を取得（例: 30→1, 31→2, 3A→11, 3Z→理解度チェック）
-function getChapterNumber(slug: string): string {
-  const match = slug.match(/^([0-9a-z]{2})[-_]/i)
-  if (!match) return ""
-
-  const code = match[1].toUpperCase()
-  const second = code[1]
-
-  // Zは「理解度チェック」なので番号なし
-  if (second === "Z") return ""
-
-  // 0-9は1-10、A-Yは11-35
-  if (second >= "0" && second <= "9") {
-    return (parseInt(second) + 1).toString()
-  }
-  return (second.charCodeAt(0) - "A".charCodeAt(0) + 11).toString()
-}
-
 // 表示名を加工（番号プレフィックスを削除し、連番を付与）
+// 注意: この関数はクライアントサイドで文字列として評価されるため、外部関数を参照できない
 const customMapFn = (node: any) => {
   const slug = node.slugSegment || ""
 
@@ -58,24 +16,58 @@ const customMapFn = (node: any) => {
   const match = slug.match(/^[0-9a-z]{2}[-_](.+)$/i)
   if (match) {
     const baseName = match[1]
-    const chapterNum = getChapterNumber(slug)
+
+    // 章内の連番を計算（インライン）
+    const codeMatch = slug.match(/^([0-9a-z]{2})[-_]/i)
+    let chapterNum = ""
+    if (codeMatch) {
+      const code = codeMatch[1].toUpperCase()
+      const second = code[1]
+      if (second !== "Z") {
+        if (second >= "0" && second <= "9") {
+          chapterNum = (parseInt(second) + 1).toString()
+        } else {
+          chapterNum = (second.charCodeAt(0) - "A".charCodeAt(0) + 11).toString()
+        }
+      }
+    }
+
     // 連番があれば付与、なければそのまま
     node.displayName = chapterNum ? `${chapterNum}. ${baseName}` : baseName
   }
 }
 
 // カスタムソート関数：order値でソート
+// 注意: この関数はクライアントサイドで文字列として評価されるため、外部関数を参照できない
 const customSortFn = (a: any, b: any) => {
   // フォルダを先に表示
   if (a.isFolder && !b.isFolder) return -1
   if (!a.isFolder && b.isFolder) return 1
 
-  // slugSegmentからorder値を取得してソート
+  // slugSegmentからorder値を計算（インライン）
+  const getOrder = (slug: string): number => {
+    if (slug.startsWith("第") || slug === "付録") return 0
+
+    const match = slug.match(/^([0-9a-z]{2})[-_]/i)
+    if (!match) return 999
+
+    const code = match[1].toUpperCase()
+    const first = code[0]
+    const second = code[1]
+
+    const charToNum = (c: string): number => {
+      if (c >= "0" && c <= "9") return parseInt(c)
+      return c.charCodeAt(0) - "A".charCodeAt(0) + 10
+    }
+
+    return charToNum(first) * 100 + charToNum(second) + 1
+  }
+
   const aSlug = a.slugSegment || a.displayName
   const bSlug = b.slugSegment || b.displayName
 
-  const aOrder = getOrderFromSlug(aSlug)
-  const bOrder = getOrderFromSlug(bSlug)
+  const aOrder = getOrder(aSlug)
+  const bOrder = getOrder(bSlug)
 
   if (aOrder !== bOrder) {
     return aOrder - bOrder
