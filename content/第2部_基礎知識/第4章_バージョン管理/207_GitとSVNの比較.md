@@ -1,6 +1,6 @@
 ---
-order: 209
-title: "009_GitとSVNの比較"
+order: 234
+title: "004_GitとSVNの比較"
 ---
 
 # GitとSVNの比較
