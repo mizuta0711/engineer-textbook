@@ -9,12 +9,12 @@ const customSortFn = (a: any, b: any) => {
 
   // フォルダ内では、フォルダ名と同じファイル（インデックス）を先頭に
   if (!a.isFolder && !b.isFolder) {
-    const aName = a.name
-    const bName = b.name
+    const aName = a.displayName
+    const bName = b.displayName
 
-    // 「第X部_」で始まるファイルを先頭に
-    const aIsIndex = aName.startsWith("第") && aName.includes("部_")
-    const bIsIndex = bName.startsWith("第") && bName.includes("部_")
+    // 「第X部」で始まるファイルを先頭に
+    const aIsIndex = aName.startsWith("第") && aName.includes("部")
+    const bIsIndex = bName.startsWith("第") && bName.includes("部")
     if (aIsIndex && !bIsIndex) return -1
     if (!aIsIndex && bIsIndex) return 1
 
@@ -23,8 +23,11 @@ const customSortFn = (a: any, b: any) => {
     if (aName !== "付録" && bName === "付録") return 1
   }
 
-  // それ以外は名前順
-  return a.name.localeCompare(b.name, "ja")
+  // それ以外は名前順（数字を考慮）
+  return a.displayName.localeCompare(b.displayName, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  })
 }
 
 // components shared across all pages
