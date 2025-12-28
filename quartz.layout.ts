@@ -14,69 +14,66 @@ export const sharedPageComponents: SharedLayout = {
   }),
 }
 
-// ソート用のヘルパー関数
-// 「第X部」「第X章」から数字を抽出、「付録」は999として扱う
-function extractOrder(name: string): { type: string; num: number } | null {
-  // 「第X部_...」のパターン
-  const buMatch = name.match(/^第(\d+)部/)
-  if (buMatch) {
-    return { type: "bu", num: parseInt(buMatch[1], 10) }
-  }
-  // 「第X章_...」のパターン
-  const shoMatch = name.match(/^第(\d+)章/)
-  if (shoMatch) {
-    return { type: "sho", num: parseInt(shoMatch[1], 10) }
-  }
-  // 「付録」のパターン
-  if (name.startsWith("付録")) {
-    return { type: "bu", num: 999 }
-  }
-  // 「XXX_...」（数字3桁で始まる）のパターン
-  const numMatch = name.match(/^(\d+)_/)
-  if (numMatch) {
-    return { type: "file", num: parseInt(numMatch[1], 10) }
-  }
-  return null
-}
-
 // カスタムソート関数
+// 注意: sortFnとmapFnはクライアントサイドで文字列から関数に変換されるため、
+// 外部の関数を参照できない。すべてのロジックを関数内に含める必要がある。
 const explorerOptions = {
   folderDefaultState: "open" as const,
   sortFn: (a: any, b: any) => {
     const aName = a.slugSegment || ""
     const bName = b.slugSegment || ""
-    const aOrder = extractOrder(aName)
-    const bOrder = extractOrder(bName)
-
+    
+    // 「第X部」のパターンをチェック
+    const aBuMatch = aName.match(/^第(\d+)部/)
+    const bBuMatch = bName.match(/^第(\d+)部/)
+    const aIsBu = aBuMatch !== null
+    const bIsBu = bBuMatch !== null
+    const aIsAppendix = aName.startsWith("付録")
+    const bIsAppendix = bName.startsWith("付録")
+    
+    // 「第X章」のパターンをチェック
+    const aShoMatch = aName.match(/^第(\d+)章/)
+    const bShoMatch = bName.match(/^第(\d+)章/)
+    const aIsSho = aShoMatch !== null
+    const bIsSho = bShoMatch !== null
+    
+    // 「XXX_」のパターンをチェック
+    const aNumMatch = aName.match(/^(\d+)_/)
+    const bNumMatch = bName.match(/^(\d+)_/)
+    const aIsFile = aNumMatch !== null
+    const bIsFile = bNumMatch !== null
+    
     // 両方とも「第X部」または「付録」の場合
-    if (aOrder?.type === "bu" && bOrder?.type === "bu") {
-      return aOrder.num - bOrder.num
+    if ((aIsBu || aIsAppendix) && (bIsBu || bIsAppendix)) {
+      const aNum = aIsAppendix ? 999 : parseInt(aBuMatch![1], 10)
+      const bNum = bIsAppendix ? 999 : parseInt(bBuMatch![1], 10)
+      return aNum - bNum
     }
-    // aが「第X部」でbがそれ以外
-    if (aOrder?.type === "bu" && bOrder?.type !== "bu") {
+    // aが「第X部」または「付録」でbがそれ以外
+    if ((aIsBu || aIsAppendix) && !(bIsBu || bIsAppendix)) {
       return -1
     }
-    // bが「第X部」でaがそれ以外
-    if (aOrder?.type !== "bu" && bOrder?.type === "bu") {
+    // bが「第X部」または「付録」でaがそれ以外
+    if (!(aIsBu || aIsAppendix) && (bIsBu || bIsAppendix)) {
       return 1
     }
 
     // 両方とも「第X章」の場合
-    if (aOrder?.type === "sho" && bOrder?.type === "sho") {
-      return aOrder.num - bOrder.num
+    if (aIsSho && bIsSho) {
+      return parseInt(aShoMatch![1], 10) - parseInt(bShoMatch![1], 10)
     }
     // aが「第X章」でbがファイル
-    if (aOrder?.type === "sho" && bOrder?.type === "file") {
+    if (aIsSho && bIsFile) {
       return -1
     }
     // bが「第X章」でaがファイル
-    if (aOrder?.type === "file" && bOrder?.type === "sho") {
+    if (aIsFile && bIsSho) {
       return 1
     }
 
     // 両方とも数字ファイル（XXX_...）の場合
-    if (aOrder?.type === "file" && bOrder?.type === "file") {
-      return aOrder.num - bOrder.num
+    if (aIsFile && bIsFile) {
+      return parseInt(aNumMatch![1], 10) - parseInt(bNumMatch![1], 10)
     }
 
     // その他はアルファベット順
