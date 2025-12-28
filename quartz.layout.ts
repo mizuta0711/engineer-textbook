@@ -14,12 +14,38 @@ export const sharedPageComponents: SharedLayout = {
   }),
 }
 
+// カスタムソート関数: ファイル名の番号順でソート
+const explorerOptions = {
+  folderDefaultState: "open" as const,
+  sortFn: (a: any, b: any) => {
+    // フォルダを先に表示
+    if (a.isFolder && \!b.isFolder) return -1
+    if (\!a.isFolder && b.isFolder) return 1
+    
+    // slugSegment（ファイル名）で比較
+    const aName = a.slugSegment || ""
+    const bName = b.slugSegment || ""
+    
+    return aName.localeCompare(bName, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    })
+  },
+  mapFn: (node: any) => {
+    // displayNameをslugSegment（ファイル名）に設定
+    // これにより「000_本書の構成」のような形式で表示される
+    if (node.slugSegment) {
+      node.displayName = node.slugSegment
+    }
+  },
+}
+
 // components for pages that display a single page (e.g. a single note)
 export const defaultContentPageLayout: PageLayout = {
   beforeBody: [
     Component.ConditionalRender({
       component: Component.Breadcrumbs(),
-      condition: (page) => page.fileData.slug !== "index",
+      condition: (page) => page.fileData.slug \!== "index",
     }),
     Component.ArticleTitle(),
     Component.ContentMeta(),
@@ -38,7 +64,7 @@ export const defaultContentPageLayout: PageLayout = {
         { Component: Component.ReaderMode() },
       ],
     }),
-    Component.Explorer(),
+    Component.Explorer(explorerOptions),
   ],
   right: [
     Component.Graph(),
@@ -62,7 +88,8 @@ export const defaultListPageLayout: PageLayout = {
         { Component: Component.Darkmode() },
       ],
     }),
-    Component.Explorer(),
+    Component.Explorer(explorerOptions),
   ],
   right: [],
 }
+
