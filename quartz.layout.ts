@@ -86,9 +86,11 @@ const explorerOptions = {
     })
   },
   mapFn: (node: any) => {
-    // displayNameをslugSegment（ファイル名）に設定
     if (node.slugSegment) {
-      node.displayName = node.slugSegment
+      // 先頭の「XXX_」（数字+アンダースコア）を削除して表示
+      // 例: "000_本書の構成" → "本書の構成"
+      const cleaned = node.slugSegment.replace(/^\d+_/, "")
+      node.displayName = cleaned
     }
   },
 }
