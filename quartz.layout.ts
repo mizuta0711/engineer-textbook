@@ -14,18 +14,72 @@ export const sharedPageComponents: SharedLayout = {
   }),
 }
 
-// カスタムソート関数: ファイル名の番号順でソート
+// ソート用のヘルパー関数
+// 「第X部」「第X章」から数字を抽出、「付録」は999として扱う
+function extractOrder(name: string): { type: string; num: number } | null {
+  // 「第X部_...」のパターン
+  const buMatch = name.match(/^第(\d+)部/)
+  if (buMatch) {
+    return { type: "bu", num: parseInt(buMatch[1], 10) }
+  }
+  // 「第X章_...」のパターン
+  const shoMatch = name.match(/^第(\d+)章/)
+  if (shoMatch) {
+    return { type: "sho", num: parseInt(shoMatch[1], 10) }
+  }
+  // 「付録」のパターン
+  if (name.startsWith("付録")) {
+    return { type: "bu", num: 999 }
+  }
+  // 「XXX_...」（数字3桁で始まる）のパターン
+  const numMatch = name.match(/^(\d+)_/)
+  if (numMatch) {
+    return { type: "file", num: parseInt(numMatch[1], 10) }
+  }
+  return null
+}
+
+// カスタムソート関数
 const explorerOptions = {
   folderDefaultState: "open" as const,
   sortFn: (a: any, b: any) => {
-    // フォルダを先に表示
-    if (a.isFolder && \!b.isFolder) return -1
-    if (\!a.isFolder && b.isFolder) return 1
-    
-    // slugSegment（ファイル名）で比較
     const aName = a.slugSegment || ""
     const bName = b.slugSegment || ""
-    
+    const aOrder = extractOrder(aName)
+    const bOrder = extractOrder(bName)
+
+    // 両方とも「第X部」または「付録」の場合
+    if (aOrder?.type === "bu" && bOrder?.type === "bu") {
+      return aOrder.num - bOrder.num
+    }
+    // aが「第X部」でbがそれ以外
+    if (aOrder?.type === "bu" && bOrder?.type !== "bu") {
+      return -1
+    }
+    // bが「第X部」でaがそれ以外
+    if (aOrder?.type !== "bu" && bOrder?.type === "bu") {
+      return 1
+    }
+
+    // 両方とも「第X章」の場合
+    if (aOrder?.type === "sho" && bOrder?.type === "sho") {
+      return aOrder.num - bOrder.num
+    }
+    // aが「第X章」でbがファイル
+    if (aOrder?.type === "sho" && bOrder?.type === "file") {
+      return -1
+    }
+    // bが「第X章」でaがファイル
+    if (aOrder?.type === "file" && bOrder?.type === "sho") {
+      return 1
+    }
+
+    // 両方とも数字ファイル（XXX_...）の場合
+    if (aOrder?.type === "file" && bOrder?.type === "file") {
+      return aOrder.num - bOrder.num
+    }
+
+    // その他はアルファベット順
     return aName.localeCompare(bName, undefined, {
       numeric: true,
       sensitivity: "base",
@@ -33,7 +87,6 @@ const explorerOptions = {
   },
   mapFn: (node: any) => {
     // displayNameをslugSegment（ファイル名）に設定
-    // これにより「000_本書の構成」のような形式で表示される
     if (node.slugSegment) {
       node.displayName = node.slugSegment
     }
@@ -45,7 +98,7 @@ export const defaultContentPageLayout: PageLayout = {
   beforeBody: [
     Component.ConditionalRender({
       component: Component.Breadcrumbs(),
-      condition: (page) => page.fileData.slug \!== "index",
+      condition: (page) => page.fileData.slug !== "index",
     }),
     Component.ArticleTitle(),
     Component.ContentMeta(),
@@ -92,4 +145,3 @@ export const defaultListPageLayout: PageLayout = {
   ],
   right: [],
 }
-
